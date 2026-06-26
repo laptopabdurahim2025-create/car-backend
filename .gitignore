@@ -1,0 +1,17 @@
+# Node modules papkasi
+node_modules/
+
+# Environment o'zgaruvchilari (maxfiy ma'lumotlar)
+.env
+
+# Log fayllar
+*.log
+npm-debug.log*
+
+# OS fayllar
+.DS_Store
+Thumbs.db
+
+# IDE fayllar
+.vscode/
+.idea/
