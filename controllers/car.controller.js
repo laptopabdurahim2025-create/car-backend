@@ -1,20 +1,12 @@
-// controllers/car.controller.js
-// Mashina (Car) uchun barcha CRUD operatsiyalari
-// Har bir funksiya bitta endpointni boshqaradi
-
 const Car = require("../models/car.model");
 
-/**
- * @desc    Barcha mashinalarni olish
- * @route   GET /api/v1/cars
- * @access  Public (ochiq)
- */
+// Barcha mashinalar
 const getAllCars = async (req, res, next) => {
   try {
-    // Barcha mashinalarni bazadan olish (eng yangilari birinchi)
-    const cars = await Car.find().sort({ createdAt: -1 });
+    const cars = await Car.find()
+      .populate("addedBy", "username avatar")
+      .sort({ createdAt: -1 });
 
-    // Muvaffaqiyatli javob
     res.status(200).json({
       success: true,
       count: cars.length,
@@ -22,22 +14,18 @@ const getAllCars = async (req, res, next) => {
       data: cars,
     });
   } catch (error) {
-    // Xatolikni middleware ga uzatish
     next(error);
   }
 };
 
-/**
- * @desc    Bitta mashinani ID bo'yicha olish
- * @route   GET /api/v1/cars/:id
- * @access  Public (ochiq)
- */
+// Bitta mashina
 const getCarById = async (req, res, next) => {
   try {
-    // ID bo'yicha mashinani topish
-    const car = await Car.findById(req.params.id);
+    const car = await Car.findById(req.params.id).populate(
+      "addedBy",
+      "username avatar",
+    );
 
-    // Agar mashina topilmasa
     if (!car) {
       return res.status(404).json({
         success: false,
@@ -45,11 +33,9 @@ const getCarById = async (req, res, next) => {
       });
     }
 
-    // Ko'rishlar sonini 1 ga oshirish
     car.viewCount += 1;
     await car.save();
 
-    // Muvaffaqiyatli javob
     res.status(200).json({
       success: true,
       message: "Mashina muvaffaqiyatli topildi",
@@ -60,64 +46,74 @@ const getCarById = async (req, res, next) => {
   }
 };
 
-/**
- * @desc    Yangi mashina qo'shish
- * @route   POST /api/v1/cars
- * @access  Public (ochiq)
- */
+// Yangi mashina
 const createCar = async (req, res, next) => {
   try {
-    // Request body dan ma'lumotlarni olish
     const { carName, color, manufacturingYear, mileage, imageUrl, viewCount } =
       req.body;
 
-    // Yangi mashina yaratish
     const newCar = await Car.create({
       carName,
       color,
       manufacturingYear,
       mileage,
       imageUrl,
-      viewCount: viewCount || 0, // Agar berilmasa 0 bo'ladi
+      viewCount: viewCount || 0,
+      addedBy: req.user ? req.user._id : null,
     });
 
-    // Muvaffaqiyatli javob (201 — yaratildi)
+    // User carsAdded ni oshirish
+    if (req.user) {
+      req.user.carsAdded += 1;
+      await req.user.save();
+    }
+
+    const populatedCar = await Car.findById(newCar._id).populate(
+      "addedBy",
+      "username avatar",
+    );
+
     res.status(201).json({
       success: true,
       message: "Yangi mashina muvaffaqiyatli qo'shildi",
-      data: newCar,
+      data: populatedCar,
     });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * @desc    Mashinani yangilash (tahrirlash)
- * @route   PUT /api/v1/cars/:id
- * @access  Public (ochiq)
- */
+// Mashinani yangilash
 const updateCar = async (req, res, next) => {
   try {
-    // ID bo'yicha mashinani topib yangilash
-    const updatedCar = await Car.findByIdAndUpdate(
-      req.params.id, // Qaysi mashinani yangilash
-      req.body, // Yangi ma'lumotlar
-      {
-        new: true, // Yangilangan versiyani qaytarish
-        runValidators: true, // Validatsiyani bajarish
-      }
-    );
+    const car = await Car.findById(req.params.id);
 
-    // Agar mashina topilmasa
-    if (!updatedCar) {
+    if (!car) {
       return res.status(404).json({
         success: false,
-        message: "Yangilanishi kerak bo'lgan mashina topilmadi",
+        message: "Mashina topilmadi",
       });
     }
 
-    // Muvaffaqiyatli javob
+    // Faqat admin yoki qo'shgan odam o'zgartira oladi
+    if (req.user) {
+      if (
+        req.user.role !== "admin" &&
+        car.addedBy &&
+        car.addedBy.toString() !== req.user._id.toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Siz faqat o'zingiz qo'shgan mashinani o'zgartira olasiz",
+        });
+      }
+    }
+
+    const updatedCar = await Car.findByIdAndUpdate(req.params.id, req.body, {
+      new: true,
+      runValidators: true,
+    }).populate("addedBy", "username avatar");
+
     res.status(200).json({
       success: true,
       message: "Mashina muvaffaqiyatli yangilandi",
@@ -128,40 +124,42 @@ const updateCar = async (req, res, next) => {
   }
 };
 
-/**
- * @desc    Mashinani o'chirish
- * @route   DELETE /api/v1/cars/:id
- * @access  Public (ochiq)
- */
+// Mashinani o'chirish
 const deleteCar = async (req, res, next) => {
   try {
-    // ID bo'yicha mashinani topib o'chirish
-    const deletedCar = await Car.findByIdAndDelete(req.params.id);
+    const car = await Car.findById(req.params.id);
 
-    // Agar mashina topilmasa
-    if (!deletedCar) {
+    if (!car) {
       return res.status(404).json({
         success: false,
-        message: "O'chirilishi kerak bo'lgan mashina topilmadi",
+        message: "Mashina topilmadi",
       });
     }
 
-    // Muvaffaqiyatli javob
+    // Faqat admin yoki qo'shgan odam o'chira oladi
+    if (req.user) {
+      if (
+        req.user.role !== "admin" &&
+        car.addedBy &&
+        car.addedBy.toString() !== req.user._id.toString()
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Siz faqat o'zingiz qo'shgan mashinani o'chira olasiz",
+        });
+      }
+    }
+
+    await Car.findByIdAndDelete(req.params.id);
+
     res.status(200).json({
       success: true,
       message: "Mashina muvaffaqiyatli o'chirildi",
-      data: deletedCar,
+      data: car,
     });
   } catch (error) {
     next(error);
   }
 };
 
-// Barcha funksiyalarni eksport qilish
-module.exports = {
-  getAllCars,
-  getCarById,
-  createCar,
-  updateCar,
-  deleteCar,
-};
+module.exports = { getAllCars, getCarById, createCar, updateCar, deleteCar };

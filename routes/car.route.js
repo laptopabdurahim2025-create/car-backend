@@ -1,6 +1,5 @@
 const express = require("express");
 const router = express.Router();
-
 const {
   getAllCars,
   getCarById,
@@ -8,8 +7,15 @@ const {
   updateCar,
   deleteCar,
 } = require("../controllers/car.controller");
+const { protect } = require("../middleware/auth.middleware");
 
-router.route("/cars").get(getAllCars).post(createCar);
-router.route("/cars/:id").get(getCarById).put(updateCar).delete(deleteCar);
+// Barcha ko'ra oladi, lekin qo'shish/o'zgartirish/o'chirish uchun login kerak
+router.route("/cars").get(getAllCars).post(protect, createCar);
+
+router
+  .route("/cars/:id")
+  .get(getCarById)
+  .put(protect, updateCar)
+  .delete(protect, deleteCar);
 
 module.exports = router;
