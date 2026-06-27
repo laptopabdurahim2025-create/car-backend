@@ -9,17 +9,33 @@ dotenv.config();
 
 const app = express();
 
+// CORS — Netlify, Vercel va localhost ga avtomatik ruxsat
 app.use(
   cors({
-    origin: [
-      "http://localhost:3000",
-      "https://apiofcars.netlify.app",
-      "https://abdurahim.maktab16.uz",
-      "http://abdurahim.maktab16.uz",
-    ],
-    methods: ["GET", "POST", "PUT", "DELETE"],
+    origin: function (origin, callback) {
+      // Origin yo'q bo'lsa (Postman, curl) ruxsat
+      if (!origin) return callback(null, true);
+
+      const allowedOrigins = [
+        "http://localhost:3000",
+        "https://abdurahim.maktab16.uz",
+        "http://abdurahim.maktab16.uz",
+      ];
+
+      if (
+        allowedOrigins.includes(origin) ||
+        origin.endsWith(".netlify.app") ||
+        origin.endsWith(".vercel.app")
+      ) {
+        return callback(null, true);
+      }
+
+      return callback(new Error("CORS bloklandi: " + origin));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization"],
-  }),
+  })
 );
 
 app.use(express.json());
@@ -33,7 +49,7 @@ app.use("/api/v1", require("./routes/admin.route"));
 app.get("/", (req, res) => {
   res.json({
     success: true,
-    message: "Car CRUD API + Auth ishlayapti!",
+    message: "Car CRUD API + Auth + Admin ishlayapti!",
   });
 });
 
@@ -41,7 +57,7 @@ app.use(errorHandler);
 
 const PORT = process.env.PORT || 5001;
 
-// Admin yaratish funksiyasi
+// Default admin yaratish
 const createDefaultAdmin = async () => {
   try {
     const adminExists = await User.findOne({ username: "admin" });

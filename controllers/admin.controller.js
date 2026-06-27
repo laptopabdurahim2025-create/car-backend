@@ -165,6 +165,39 @@ const deleteUser = async (req, res, next) => {
   }
 };
 
+// Foydalanuvchi parolini almashtirish (admin)
+const resetUserPassword = async (req, res, next) => {
+  try {
+    const { newPassword } = req.body;
+
+    if (!newPassword || newPassword.length < 6) {
+      return res.status(400).json({
+        success: false,
+        message: "Yangi parol kamida 6 belgi bo'lishi kerak",
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Foydalanuvchi topilmadi",
+      });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: `${user.username} ning paroli muvaffaqiyatli o'zgartirildi`,
+    });
+  } catch (error) {
+    next(error);
+  }
+};
+
 // Dashboard statistika
 const getDashboard = async (req, res, next) => {
   try {
@@ -198,5 +231,6 @@ module.exports = {
   makeAdmin,
   removeAdmin,
   deleteUser,
+  resetUserPassword,
   getDashboard,
 };
